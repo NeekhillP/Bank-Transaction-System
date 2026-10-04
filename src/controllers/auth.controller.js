@@ -1,5 +1,6 @@
 import userModel from '../models/user.model.js';
 import jwt from 'jsonwebtoken';
+import sendRegistrationEmail from '../services/email.service.js';
 
 /**
  * - user Register controller
@@ -34,6 +35,7 @@ export async function userRegister(req, res){
 
     res.cookie('jwt_token', token)
 
+
     res.status(201).json({
         message: "User registered successfully",
         user: {
@@ -42,6 +44,15 @@ export async function userRegister(req, res){
         },
         token: token
     })
+
+    // Send registration email
+    try{
+        await sendRegistrationEmail(newUser.email, newUser.name);
+        console.log('Registration email sent successfully');
+    } catch (error) {
+        console.error('Error sending registration email:', error);
+    }
+
 }
 
 
