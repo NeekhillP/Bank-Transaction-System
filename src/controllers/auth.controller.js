@@ -1,6 +1,6 @@
 import userModel from '../models/user.model.js';
 import jwt from 'jsonwebtoken';
-import sendRegistrationEmail from '../services/email.service.js';
+import {sendRegistrationEmail} from '../services/email.service.js';
 
 /**
  * - user Register controller
