@@ -3,11 +3,12 @@ import ledgerModel from '../models/ledger.model.js';
 import accountModel from '../models/account.model.js';
 import { sendTransactionEmail, sendTransactionFailureEmail } from '../services/email.service.js';
 import mongoose from 'mongoose';
+
+
+
 /**
  * * - Create a new transaction 
  */
-
-
 export async function createTransaction(req, res){
     // 1. Validate request body
     const {fromAccount, toAccount, amount, idempotencyKey} = req.body;
@@ -128,4 +129,82 @@ export async function createTransaction(req, res){
         return res.status(500).json({message: 'Internal server error', error: error.message})
     }
 
+}
+
+/**
+ * Creates a new transaction for system initial funds.
+ */
+
+export async function createSystemInitialFundsTransaction(req, res){
+    const {toAccount, amount, idempotencyKey} = req.body;
+
+    if(!toAccount || !amount || !idempotencyKey){
+        return res.status(400).json({message: 'Missing required fields'});
+    }
+
+    try{
+        const toUserAccount = await accountModel.findOne({
+            _id: toAccount,
+        })
+
+        if(!toUserAccount){
+            return res.status(404).json({message: 'Account not found'});
+        }
+
+        const fromUserAccount = await accountModel.findOne({
+            user: req.user._id
+        })
+
+        if(!fromUserAccount){
+            return res.status(404).json({message: 'System user account not found'});
+        }
+
+
+        // Initialize a new transaction for system initial funds
+
+        const session = await mongoose.startSession();
+        session.startTransaction();
+
+
+        const transaction = new transactionModel({
+            fromAccount: fromUserAccount._id,
+            toAccount: toUserAccount._id,
+            amount,
+            idempotencyKey,
+            status: 'PENDING'
+        });
+
+
+        const debitLedgerEntry = await ledgerModel.create([{
+            account: fromUserAccount._id,
+            amount: amount,
+            type: 'DEBIT',
+            transaction: transaction._id
+        }], {session});
+        
+
+        const creditLedgerEntry = await ledgerModel.create([{
+            account: toUserAccount._id,
+            amount: amount,
+            type: 'CREDIT',
+            transaction: transaction._id
+        }], {session});
+
+
+        transaction.status = 'COMPLETED';
+        await transaction.save({session});
+
+        await session.commitTransaction();
+        session.endSession();
+
+        return res.status(201).json({
+            message: 'System initial funds transaction completed successfully',
+            transaction: transaction
+        })
+
+
+
+    }catch(error){
+        return res.status(500).json({message: 'Internal server error', error: error.message})
+    }
 }
