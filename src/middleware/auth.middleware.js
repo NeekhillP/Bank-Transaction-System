@@ -4,7 +4,7 @@ import jwt from 'jsonwebtoken';
 
 
 export async function authMiddleware(req, res, next) {
-    const token = req.cookies?.jwt_token || req.headers.authorization?.split(' ')[1];
+    const token = req.headers.authorization?.match(/^Bearer\s+(\S+)$/i)?.[1] || req.cookies?.jwt_token;
 
     if(!token){
         return res.status(401).json({ message: 'Unauthorized' });
@@ -31,7 +31,7 @@ export async function authMiddleware(req, res, next) {
 
 export async function authSystemUserMiddleware(req, res, next){
 
-    const token = req.cookies?.jwt_token || req.headers.authorization?.split(' ')[1];
+    const token = req.headers.authorization?.match(/^Bearer\s+(\S+)$/i)?.[1] || req.cookies?.jwt_token;
 
     if(!token){
         return res.status(401).json({ message: 'Unauthorized' });

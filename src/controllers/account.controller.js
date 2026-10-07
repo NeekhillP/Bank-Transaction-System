@@ -16,3 +16,16 @@ export async function createAccountController(req, res){
     })
 }
     
+
+export async function getUserAccountsController(req, res){
+
+    const accounts = await accountModel.find({
+        user: req.user._id
+    })
+
+    res.status(200).json({
+        message: "Accounts fetched succesfully",
+        accounts
+    })
+
+}

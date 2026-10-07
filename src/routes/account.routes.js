@@ -14,4 +14,14 @@ const accountRoutes = Router();
 accountRoutes.post('/', authMiddleware, accountController.createAccountController )
 
 
+/**
+ * - GET /api/accounts/
+ * - Get all accounts for the authenticated user
+ *  - Protected route, requires authentication
+ */
+
+accountRoutes.get('/', authMiddleware, accountController.getUserAccountsController)
+
+
+
 export default accountRoutes;
