@@ -16,6 +16,8 @@ const systemToken = jwt.sign({ userId: systemId }, secret);
 const previousSecret = process.env.JWT_SECRET;
 const previousFindById = userModel.findById;
 const previousFind = accountModel.find;
+const previousFindOne = accountModel.findOne;
+let balance = 500;
 let server;
 let url;
 
@@ -25,6 +27,12 @@ before(async () => {
     accountModel.find = async (filter) => {
         assert.deepEqual(Object.keys(filter), ['user']);
         return filter.user === ownerId ? [account] : [];
+    };
+    accountModel.findOne = async (filter) => {
+        assert.deepEqual(Object.keys(filter).sort(), ['_id', 'user']);
+        return filter._id === account._id && filter.user === ownerId
+            ? { ...account, getBalance: async () => balance }
+            : null;
     };
     const app = express();
     app.use(cookieParser());
@@ -40,6 +48,7 @@ before(async () => {
 after(async () => {
     userModel.findById = previousFindById;
     accountModel.find = previousFind;
+    accountModel.findOne = previousFindOne;
     if (previousSecret === undefined) delete process.env.JWT_SECRET;
     else process.env.JWT_SECRET = previousSecret;
     if (server) await new Promise((resolve) => server.close(resolve));
@@ -80,5 +89,54 @@ test('an invalid explicit token is rejected even when the cookie is valid', asyn
     const response = await fetch(url, { headers: {
         authorization: 'Bearer invalid', cookie: `jwt_token=${ownerToken}`,
     } });
+    assert.equal(response.status, 401);
+});
+
+test('balance route returns the ledger balance for the account owner', async () => {
+    const response = await fetch(`${url}/balance/${account._id}`, {
+        headers: { authorization: `Bearer ${ownerToken}` },
+    });
+    assert.equal(response.status, 200);
+    assert.equal((await response.json()).balance, 500);
+});
+
+test('balance route returns zero for an account without ledger entries', async () => {
+    balance = 0;
+    try {
+        const response = await fetch(`${url}/balance/${account._id}`, {
+            headers: { authorization: `Bearer ${ownerToken}` },
+        });
+        assert.equal(response.status, 200);
+        assert.equal((await response.json()).balance, 0);
+    } finally {
+        balance = 500;
+    }
+});
+
+test('balance route rejects a user ID used in place of an account ID', async () => {
+    const response = await fetch(`${url}/balance/${ownerId}`, {
+        headers: { authorization: `Bearer ${ownerToken}` },
+    });
+    assert.equal(response.status, 404);
+    assert.match((await response.json()).message, /GET \/api\/account/);
+});
+
+test('balance route does not expose another user account balance', async () => {
+    const response = await fetch(`${url}/balance/${account._id}`, {
+        headers: { authorization: `Bearer ${systemToken}` },
+    });
+    assert.equal(response.status, 404);
+});
+
+test('balance route rejects malformed account IDs as JSON', async () => {
+    const response = await fetch(`${url}/balance/not-an-id`, {
+        headers: { authorization: `Bearer ${ownerToken}` },
+    });
+    assert.equal(response.status, 400);
+    assert.match((await response.json()).message, /Invalid account ID/);
+});
+
+test('balance route requires authentication', async () => {
+    const response = await fetch(`${url}/balance/${account._id}`);
     assert.equal(response.status, 401);
 });

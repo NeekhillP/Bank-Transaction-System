@@ -24,4 +24,12 @@ accountRoutes.get('/', authMiddleware, accountController.getUserAccountsControll
 
 
 
+/**
+ * - GET /api/accounts/balance/:accountId
+ * - Get the balance of a specific account by accountId
+ *  - Protected route, requires authentication
+ */
+ accountRoutes.get('/balance/:accountId', authMiddleware, accountController.getAccountBalanceController)
+
+
 export default accountRoutes;
